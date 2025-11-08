@@ -22,6 +22,12 @@ RE_SMALLTALK = re.compile(
     re.IGNORECASE,
 )
 
+# Hỏi ngày hôm nay (hoặc today)
+RE_TODAY = re.compile(
+    r"(h[oô]m\s*nay|today)", re.IGNORECASE
+)
+
+
 def _time_to_int(t: str) -> int:
     h, m = t.split(":")
     return int(h) * 60 + int(m)

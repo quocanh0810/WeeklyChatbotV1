@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>TMU Weekly – Admin</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="shell">
+    <!-- Logo/brand nhỏ -->
+    <header class="brand">
+      <div class="dot"></div>
+      <span>TMU Weekly – Admin</span>
+    </header>
+
+    <!-- Login card (center) -->
+    <section id="login" class="card card--login appear">
+      <h1>Đăng nhập</h1>
+      <p class="muted">Chỉ dành cho quản trị viên</p>
+
+      <form id="fLogin" class="form">
+        <div class="field">
+          <label>User</label>
+          <input name="username" placeholder="Tên đăng nhập" required autocomplete="username" />
+        </div>
+        <div class="field">
+          <label>Pass</label>
+          <input name="password" placeholder="Mật khẩu" type="password" required autocomplete="current-password"/>
+        </div>
+
+        <button class="btn" id="btnLogin" type="submit">
+          <span class="btn__label">Login</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+        <p id="loginMsg" class="msg"></p>
+      </form>
+    </section>
+
+    <!-- App content (ẩn trước, hiện sau khi login) -->
+    <main id="app" class="app hidden">
+      <section class="card">
+        <h2>Tải lịch tuần (.docx)</h2>
+        <form id="fPreview" class="form form--inline">
+          <input type="file" name="file" accept=".docx" required />
+          <input type="number" name="year" placeholder="Năm (tuỳ chọn)"/>
+          <button class="btn btn--ghost" type="submit">Xem trước</button>
+        </form>
+        <pre id="preview" class="pre"></pre>
+
+        <form id="fIngest" class="form hidden">
+          <input type="hidden" name="temp_path" />
+          <div class="choice">
+            <label><input type="radio" name="mode" value="append" checked/> Append</label>
+            <label><input type="radio" name="mode" value="rebuild"/> Rebuild</label>
+            <label><input type="checkbox" name="dedupe" checked/> Dedupe</label>
+            <input name="tag" placeholder="Tag (tuần)"/>
+          </div>
+          <button class="btn" type="submit">
+            <span class="btn__label">Ingest</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <h2>Lịch sử uploads</h2>
+          <button id="btnRefresh" class="btn btn--ghost">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table id="tbl" class="table"></table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

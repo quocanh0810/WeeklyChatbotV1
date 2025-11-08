@@ -22,9 +22,20 @@ cp .env.example .env
 python parse_schedule.py --input data/lich_tuan_3_2025_2026.docx --out data/schedule.jsonl
 
 # 2) Ingest vào FAISS/SQLite
+# Lần đầu
 python ingest_faiss.py --jsonl data/schedule.jsonl --store-dir rag_store
 
+#Lần sau - append
+python ingest_faiss.py --jsonl data/week_2.jsonl --store-dir rag_store --append
 # 3) Chạy Web
 
+#Web Chatbot
 uvicorn web_app:app --reload --port 8000
+
+#Web Admin Dashboard
+uvicorn rag.web_app:app --reload --port 
+
+#Tạo tài khoản, thêm biến sau trong .evn:
+ADMIN_USER=...
+ADMIN_PASS=...
 ```
