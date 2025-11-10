@@ -32,7 +32,7 @@ from .textkit import (
     _canon_dow,
 )
 
-# ---------------- LLM client ----------------
+# LLM client
 gclient = genai.Client(api_key=GEMINI_API_KEY)
 
 SYSTEM_PROMPT = (
@@ -41,7 +41,7 @@ SYSTEM_PROMPT = (
     "Luôn nêu rõ NGÀY, THỨ, GIỜ, ĐỊA ĐIỂM, THÀNH PHẦN nếu có."
 )
 
-# ---------------- Helpers ----------------
+# Helpers
 VI_DOW = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"]  # datetime.weekday(): 0..6
 
 def _fmt_vi_date(d: datetime) -> tuple[str, str]:
@@ -56,7 +56,7 @@ def _is_tomorrow_question(q: str) -> bool:
     ql = q.lower()
     return ("ngày mai" in ql or "tomorrow" in ql) and any(k in ql for k in ["ngày", "date", "mấy", "thứ"])
 
-# ---------------- intent ----------------
+# intent
 def classify_intent(q: str) -> str:
     qn = (q or "").strip().lower()
     if not qn:
@@ -101,7 +101,7 @@ def _general_reply(q: str) -> str:
         pass
     return "Mình chưa chắc câu này. Bạn có thể hỏi lại ngắn gọn hơn không?"
 
-# ---------------- LLM prompt builder ----------------
+# LLM prompt builder
 def build_prompt(question: str, contexts: List[Dict]) -> str:
     header = SYSTEM_PROMPT + "\n\n[CÁC ĐOẠN LIÊN QUAN]\n"
     ctx = ""
@@ -138,7 +138,7 @@ def call_gemini(prompt: str) -> str:
         pass
     return ""
 
-# ---------------- pydantic I/O ----------------
+# pydantic I/O
 class Ask(BaseModel):
     question: str = Field(..., description="Câu hỏi người dùng")
 
@@ -146,12 +146,12 @@ class Ask(BaseModel):
     def _strip(cls, v: str) -> str:
         return (v or "").strip()
 
-# ---------------- main service ----------------
+# main service
 def ask(payload: Ask):
     q = (payload.question or "").strip()
     t_from, t_to = parse_times(q)
 
-    # ƯU TIÊN: Câu hỏi “HÔM NAY/NGÀY MAI là ngày bao nhiêu/thứ mấy?”
+    # Câu hỏi “HÔM NAY/NGÀY MAI là ngày bao nhiêu/thứ mấy?”
     if _is_today_question(q):
         today = datetime.now()
         date_str, dow = _fmt_vi_date(today)
@@ -191,7 +191,7 @@ def ask(payload: Ask):
     if intent == "GENERAL":
         return {"answer": _general_reply(q), "hits": []}
 
-    # ---- SCHEDULE_ALL ----
+    # SCHEDULE_ALL
     if intent == "SCHEDULE_ALL":
         dates = list_all_dates()
         if not dates:
@@ -205,7 +205,7 @@ def ask(payload: Ask):
         final = "Mình vừa tổng hợp lịch công tác của toàn bộ tuần:\n\n" + "\n\n".join(answers)
         return {"answer": final, "hits": all_hits}
 
-    # ---- SCHEDULE (theo ngày/giờ) ----
+    # SCHEDULE (theo ngày/giờ)
     # dd/mm/yyyy
     m = RE_DDMMYYYY.search(q)
     if m:
@@ -256,7 +256,7 @@ def ask(payload: Ask):
                     }
                 return {"answer": format_events_full(events), "hits": events}
 
-    # Chỉ có giờ → quét cả tuần
+    # Chỉ có giờ -> quét cả tuần
     if t_from and not (m or m2 or mdow):
         grouped, all_hits = {}, []
         for ds in list_all_dates():
@@ -267,7 +267,7 @@ def ask(payload: Ask):
                 all_hits.extend(hit)
         return {"answer": format_events_by_time_across_week(grouped, t_from, t_to), "hits": all_hits}
 
-    # ---- Fallback: RAG + LLM ----
+    # Fallback: RAG + LLM
     hits = vector_search(q, k=20)
     prompt = build_prompt(q, hits)
     txt = call_gemini(prompt).strip()

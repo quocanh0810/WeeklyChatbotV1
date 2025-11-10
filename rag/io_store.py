@@ -7,7 +7,7 @@ from functools import lru_cache
 
 from .settings import SQLITE_PATH, FAISS_PATH, LOCAL_EMB_MODEL
 
-# ---------- SQLite ----------
+# SQLite
 def get_events_by_date(date_str: str) -> List[Dict]:
     conn = sqlite3.connect(SQLITE_PATH); cur = conn.cursor()
     cur.execute(

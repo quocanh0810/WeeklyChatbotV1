@@ -1,145 +1,224 @@
-# rag/parser.py
+# rag/parser.py — TMU Weekly (state-machine parser, finalized)
 from __future__ import annotations
-import re, datetime as dt
-from collections import Counter
-from typing import List, Dict, Optional
+import re
+import datetime as dt
+from typing import List, Dict, Optional, Tuple
 from docx import Document
 
-RE_DATE_YYYY = re.compile(r"\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2})\b")
-RE_DATE_DDMM = re.compile(r"\b(\d{1,2})[\/\-](\d{1,2})\b")
-RE_TIME      = re.compile(r"\b(\d{1,2})(?::|h)(\d{2})\b")      # 08:30 | 8h30
-RE_TIME_H    = re.compile(r"\b(\d{1,2})h\b")                   # 8h
-RE_DOW       = re.compile(r"\b(thứ\s*[2-7]|thứ\s*cn|cn|chủ nhật|thu\s*[2-7])\b", re.I)
+# Regex
+RE_DOW_HDR    = re.compile(r"\b(Thứ\s*[2-7]|Chủ\s*nhật|CN|cn|thu\s*[2-7])\b", re.I)
+RE_DDMM       = re.compile(r"\b(\d{1,2})[\/\-](\d{1,2})\b")
+RE_DDMMYY     = re.compile(r"\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b")
 
-def _norm_dow(s: str) -> Optional[str]:
-    s = s.strip().lower()
-    s = s.replace("thu", "thứ").replace("  ", " ")
-    m = re.search(RE_DOW, s)
-    if not m: 
-        return None
-    t = m.group(1).lower().replace("  ", " ")
-    t = t.replace("chủ nhật", "cn").replace("thứ cn", "cn")
-    t = t.replace("thứ ", "Thứ ")
-    if t == "cn": return "Chủ nhật"
-    if t.startswith("thứ"):
-        n = re.findall(r"\d", t)
-        if n: return f"Thứ {n[0]}"
-    return None
+# giờ: 08:30 | 8h30 | 8:00 | 8h
+RE_HHMM       = re.compile(r"\b(\d{1,2})[:h](\d{2})\b", re.I)
+RE_HH         = re.compile(r"\b(\d{1,2})\s*h\b", re.I)
 
-def infer_year_from_doc(doc: Document) -> Optional[int]:
-    # lấy năm xuất hiện nhiều nhất trong doc
-    years = Counter(re.findall(r"\b(20\d{2})\b", "\n".join(p.text for p in doc.paragraphs)))
-    # quét cả bảng
-    for tbl in doc.tables:
-        for row in tbl.rows:
-            cell_text = " | ".join(c.text for c in row.cells)
-            years.update(re.findall(r"\b(20\d{2})\b", cell_text))
-    if not years: 
-        return None
-    year, _ = years.most_common(1)[0]
+# khoảng giờ: 08:00-11:30 | 8h-11h30 | 08:00 đến 11:30 | Từ 8h đến 11h30
+RE_TIME_RANGE = re.compile(
+    r"\b(?:từ\s*)?(\d{1,2})(?:[:h](\d{2}))?\s*(?:-|–|—|đến|tới|->)\s*(\d{1,2})(?:[:h](\d{2}))?",
+    re.I
+)
+
+# location tag & bullets
+RE_LOC_TAG    = re.compile(r"\b(địa\s*điểm\s*[:：]|tại)\b", re.I)
+RE_BULLET     = re.compile(r"^[\*\-\u2022]+\s*")
+
+# TP / Thành phần / Mời dự
+RE_TP         = re.compile(r"^(TP|Thành\s*phần|Mời\s*dự)\s*[:：\-]\s*(.+)$", re.I)
+
+DOW_VI = ["Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7","Chủ nhật"]
+
+# Helpers
+def _fmt_date(d: dt.date) -> str:
+    return f"{d.day:02d}/{d.month:02d}/{d.year:04d}"
+
+def _dow_vi(d: dt.date) -> str:
+    # datetime.weekday(): 0=Mon..6=Sun
+    return DOW_VI[d.weekday()] if d.weekday() < 6 else "Chủ nhật"
+
+def _coerce_year(day: int, mon: int, default_year: int) -> Optional[dt.date]:
     try:
-        y = int(year)
-        if 2000 <= y <= 2100:
-            return y
-    except Exception:
-        pass
-    return None
+        return dt.date(default_year, mon, day)
+    except ValueError:
+        return None
 
-def _fmt_date(d: int, m: int, y: int) -> str:
-    return f"{d:02d}/{m:02d}/{y:04d}"
+def _smart_cap(s: str) -> str:
+    s = s.strip()
+    if not s:
+        return s
+    return s[0].upper() + s[1:]
 
-def _extract_time(s: str) -> (Optional[str], Optional[str]):
-    # lấy 1 khoảng giờ (đầu–cuối) nếu có
-    times = RE_TIME.findall(s)
-    if times:
-        # nếu có >=2 mốc thì coi [0] là start, [1] là end
-        if len(times) >= 2:
-            h1, m1 = times[0]; h2, m2 = times[1]
-            return f"{int(h1):02d}:{int(m1):02d}", f"{int(h2):02d}:{int(m2):02d}"
-        else:
-            h1, m1 = times[0]
-            return f"{int(h1):02d}:{int(m1):02d}", None
-    m = RE_TIME_H.search(s)
+def _norm_time(s: str) -> Tuple[Optional[str], Optional[str]]:
+    # Ưu tiên khoảng giờ
+    m = RE_TIME_RANGE.search(s)
     if m:
-        return f"{int(m.group(1)):02d}:00", None
+        h1, m1, h2, m2 = m.groups()
+        start = f"{int(h1):02d}:{int(m1 or 0):02d}"
+        end   = f"{int(h2):02d}:{int(m2 or 0):02d}"
+        return start, end
+
+    # Một mốc giờ
+    mm = RE_HHMM.search(s)
+    if mm:
+        h, m_ = mm.groups()
+        return f"{int(h):02d}:{int(m_):02d}", None
+    hh = RE_HH.search(s)
+    if hh:
+        return f"{int(hh.group(1)):02d}:00", None
     return None, None
 
+def infer_year_from_doc(doc: Document) -> Optional[int]:
+    # đoán năm xuất hiện trong file
+    def _scan(text: str) -> Optional[int]:
+        for m in re.finditer(r"\b(20\d{2})\b", text):
+            y = int(m.group(1))
+            if 2000 <= y <= 2100:
+                return y
+        return None
+    y = _scan(" ".join(p.text for p in doc.paragraphs))
+    if y: return y
+    for tb in doc.tables:
+        for r in tb.rows:
+            y = _scan(" | ".join(c.text for c in r.cells))
+            if y: return y
+    return None
+
+# Core Parser
 def parse_docx_as_table(path: str, default_year: Optional[int] = None) -> List[Dict]:
     """
-    Trích các hàng trong bảng thành events:
-    {date, dow, start, end, location, participants, title, raw}
+    Parser chuyên TMU:
+      - Cột trái: 'Thứ X' + 'dd/mm'
+      - Cột phải: từng dòng/bullet là một sự kiện
+      - Dòng 'TP/Thành phần/Mời dự' ghép vào event trước đó
+    Trả về: [{date,dow,start,end,location,participants,title,raw}]
     """
-    doc = Document(path)
+    doc  = Document(path)
     year = default_year or infer_year_from_doc(doc) or dt.date.today().year
 
     events: List[Dict] = []
+    cur_date: Optional[str] = None
+    cur_dow:  Optional[str] = None
+    last_event_idx: Optional[int] = None
 
-    def emit_from_text(raw_line: str):
-        nonlocal year
-        raw = " ".join(raw_line.split())
-        if not raw: 
+    def _scan_day_and_date(s: str) -> bool:
+        nonlocal cur_date, cur_dow
+        s1 = " ".join(s.split())
+        m_dow = RE_DOW_HDR.search(s1)
+        m_dm  = RE_DDMM.search(s1) or RE_DDMMYY.search(s1)
+        if m_dow and m_dm:
+            d = int(m_dm.group(1)); m = int(m_dm.group(2))
+            y = int(m_dm.group(3)) + 2000 if (m_dm.lastindex == 3 and len(m_dm.group(3)) == 2) else year
+            d_real = _coerce_year(d, m, y)
+            if d_real:
+                cur_date = _fmt_date(d_real)
+                w = m_dow.group(1).lower()
+                if "chủ nhật" in w or w in ("cn","CN"):
+                    cur_dow = "Chủ nhật"
+                else:
+                    num = re.search(r"[2-7]", w)
+                    cur_dow = f"Thứ {num.group(0)}" if num else None
+                return True
+        return False
+
+    def _flush_tp(tp_text: str):
+        nonlocal last_event_idx
+        if last_event_idx is None:
             return
-        # date
-        dstr, dow = None, None
-        m = RE_DATE_YYYY.search(raw)
-        if m:
-            d, mth, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
-            dstr = _fmt_date(d, mth, y)
+        tp_text = _smart_cap(tp_text.strip(" .;"))
+        prev = events[last_event_idx].get("participants")
+        events[last_event_idx]["participants"] = f"{prev}; {tp_text}" if prev else tp_text
+
+    def _extract_location(full_text: str) -> Tuple[Optional[str], Optional[Tuple[int,int]]]:
+        m = RE_LOC_TAG.search(full_text)
+        if not m:
+            return None, None
+        tail = full_text[m.end():].strip()
+        # cắt trước phần TP/Thành phần nếu có
+        cut_at = None
+        tp_pos = re.search(r"\b(Thành\s*phần|TP|Mời\s*dự)\b", tail, re.I)
+        if tp_pos:
+            cut_at = tp_pos.start()
         else:
-            m2 = RE_DATE_DDMM.search(raw)
-            if m2:
-                d, mth = int(m2.group(1)), int(m2.group(2))
-                dstr = _fmt_date(d, mth, year)
-        # dow
-        dow = _norm_dow(raw) or None
-        # time
-        start, end = _extract_time(raw)
-        # heuristics cho location / participants / title
-        location = None
-        participants = None
-        title = None
+            colon = tail.find(":")
+            if 0 <= colon <= 40:
+                cut_at = colon
+        loc = (tail[:cut_at] if cut_at is not None else tail).strip(" .;–—|-")
+        loc = _smart_cap(loc)
+        return (loc or None), (m.start(), m.end())
 
-        # tách theo các nhãn thường gặp
-        low = raw.lower()
-        # địa điểm
-        for key in ["tại ", "địa điểm:", "địa điểm "]:
-            if key in low:
-                cut = low.index(key) + len(key)
-                location = raw[cut:].split("  ")[0].strip()
-                break
-        # thành phần
-        for key in ["thành phần:", "tp:", "thành phần "]:
-            if key in low:
-                cut = low.index(key) + len(key)
-                participants = raw[cut:].strip()
-                break
-        # title
-        title = raw
+    def _emit_event(raw_line: str):
+        nonlocal last_event_idx
+        raw = " ".join(raw_line.split())
+        raw = RE_BULLET.sub("", raw)
+        if not raw:
+            return
 
-        events.append({
-            "date": dstr,
-            "dow": dow,
+        start, end = _norm_time(raw)
+        location, loc_span = _extract_location(raw)
+
+        # title: bỏ giờ + bỏ cụm "tại/địa điểm"
+        title = RE_TIME_RANGE.sub("", raw)
+        title = RE_HHMM.sub("", title)
+        title = RE_HH.sub("", title)
+        if loc_span:
+            title = title[:loc_span[0]] + title[loc_span[1]:]
+        title = _smart_cap(title.strip(" ,;–—|-"))
+
+        ev = {
+            "date": cur_date,
+            "dow":  cur_dow,
             "start": start,
             "end": end,
             "location": location,
-            "participants": participants,
-            "title": title,
-            "raw": raw,
-        })
+            "participants": None,
+            "title": title if title else None,
+            "raw": raw_line.strip()
+        }
+        events.append(ev)
+        last_event_idx = len(events) - 1
 
-    # Ưu tiên quét bảng
+    # Scan tài liệu
     if doc.tables:
-        for tbl in doc.tables:
-            for row in tbl.rows:
-                # gộp cả hàng thành một dòng, nếu bảng đã tách cột thì càng chuẩn
-                line = " | ".join(c.text.strip() for c in row.cells if c.text.strip())
-                emit_from_text(line)
+        for tb in doc.tables:
+            for row in tb.rows:
+                left  = row.cells[0].text if len(row.cells) >= 1 else ""
+                right = row.cells[1].text if len(row.cells) >= 2 else ""
 
-    # fallback: không có bảng → quét paragraph
+                if left.strip():
+                    _scan_day_and_date(left)
+
+                for line in (l.strip() for l in right.split("\n")):
+                    if not line:
+                        continue
+                    m_tp = RE_TP.match(line)
+                    if m_tp:
+                        _flush_tp(m_tp.group(2))
+                        continue
+                    if _scan_day_and_date(line):
+                        continue
+                    _emit_event(line)
     else:
         for p in doc.paragraphs:
-            emit_from_text(p.text)
+            line = p.text.strip()
+            if not line:
+                continue
+            m_tp = RE_TP.match(line)
+            if m_tp:
+                _flush_tp(m_tp.group(2))
+                continue
+            if _scan_day_and_date(line):
+                continue
+            _emit_event(line)
 
-    # lọc những dòng rỗng rãi quá
-    events = [e for e in events if any([e.get("date"), e.get("start"), e.get("title")])]
+    # Lọc rác & bổ sung DOW từ date nếu thiếu
+    events = [e for e in events if e.get("title") or e.get("start") or e.get("date")]
+    for e in events:
+        if not e.get("dow") and e.get("date"):
+            try:
+                d = dt.datetime.strptime(e["date"], "%d/%m/%Y").date()
+                e["dow"] = _dow_vi(d)
+            except Exception:
+                pass
+
     return events

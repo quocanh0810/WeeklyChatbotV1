@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional
 
-# ===================== Regex & parsing =====================
+# Regex & parsing
 RE_DDMMYYYY = re.compile(r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b")
 RE_DDMM     = re.compile(r"\b(\d{1,2})[/-](\d{1,2})\b")
 RE_DOW = re.compile(
@@ -63,7 +63,7 @@ def filter_events_by_time(events: List[Dict], t_from: str, t_to: Optional[str] =
                 if max(si, tf) <= min(ei, tt): out.append(ev)
     return out
 
-# ===================== KB & DOW normalization =====================
+# KB & DOW normalization
 TMU_WEEKLY_KB = {
     "definition": (
         "“Lịch tuần” của Trường Đại học Thương Mại (TMU) là văn bản/tập tin tổng hợp "
@@ -117,7 +117,7 @@ def _canon_dow(s: str) -> str:
             return canon
     return q
 
-# ===================== Formatters =====================
+# Formatters
 def _format_event_lines(events: list[dict]) -> list[str]:
     out_blocks: list[str] = []
     evs = sorted(events, key=lambda ev: (ev.get("start") or "99:99", ev.get("id") or 0))

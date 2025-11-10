@@ -1,16 +1,20 @@
-# admin_api.py  (nằm ở project root, cùng cấp web_app.py)
+# admin_api.py
 from __future__ import annotations
 import os, io, json, datetime as dt, sqlite3
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 
-# các file auth/ingest/parser đều nằm TRONG package rag/
+# các file auth/ingest/parser TRONG package rag/
 from admin_auth import require_admin, make_token, ADMIN_USER, ADMIN_PASS
 from rag.parser import parse_docx_as_table, infer_year_from_doc
 from rag.ingest_lib import append_events, rebuild_events
 
-STORE_DIR = os.getenv("STORE_DIR", "rag_store")
-DB_PATH   = os.path.join(STORE_DIR, "chunks.sqlite")
+from pathlib import Path
+BASE_DIR    = Path(__file__).resolve().parent   # thư mục project
+UPLOAD_DIR  = BASE_DIR / "data" / "uploads"     # tách riêng folder uploads
+STORE_DIR   = os.getenv("STORE_DIR", "rag_store")
+DB_PATH     = os.path.join(STORE_DIR, "chunks.sqlite")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -21,43 +25,57 @@ def login(username: str = Form(...), password: str = Form(...)):
     return {"token": make_token(username)}
 
 @router.post("/upload/preview")
-def upload_preview(file: UploadFile = File(...), year: int | None = Form(None), 
+@router.post("/upload/preview")
+def upload_preview(file: UploadFile = File(...), year: int | None = Form(None),
                    admin: str = Depends(require_admin)):
-    content = file.file.read()
-    # lưu file tạm (tuỳ thích)
-    tmp_path = os.path.join("data", f"upload_{int(dt.datetime.now().timestamp())}_{file.filename}")
-    os.makedirs("data", exist_ok=True)
-    with open(tmp_path, "wb") as f: f.write(content)
+    # tên file an toàn
+    safe_name = Path(file.filename).name
+    tmp_name  = f"upload_{int(dt.datetime.now().timestamp())}_{safe_name}"
+    tmp_path  = (UPLOAD_DIR / tmp_name)                # Path object (absolute)
+    content   = file.file.read()
+    tmp_path.write_bytes(content)
 
     # parse
     try:
         from docx import Document
-        doc = Document(tmp_path)
+        doc = Document(tmp_path.as_posix())
         default_year = year or infer_year_from_doc(doc) or dt.date.today().year
-        events = parse_docx_as_table(tmp_path, default_year)
+        events = parse_docx_as_table(tmp_path.as_posix(), default_year)
     except Exception as e:
         raise HTTPException(400, f"parse_error: {e}")
 
-    # trả preview (giới hạn 300 dòng)
-    return {"file": file.filename, "temp_path": tmp_path, "count": len(events), "events": events[:300]}
+    return {
+        "file": safe_name,
+        "temp_path": tmp_path.as_posix(),
+        "count": len(events),
+        "events": events[:300],
+    }
 
 @router.post("/ingest")
 def do_ingest(bg: BackgroundTasks,
               temp_path: str = Form(...),
-              mode: str = Form("append"),      # append | rebuild
-              tag: str  = Form(None),
+              mode: str = Form("append"),
+              tag: str = Form(None),
               dedupe: bool = Form(True),
               admin: str = Depends(require_admin)):
-    # chạy nền để không block request
+
+    # Chuẩn hoá: nếu user gửi tương đối → ghép vào UPLOAD_DIR
+    p = Path(temp_path)
+    if not p.is_absolute():
+        p = (UPLOAD_DIR / p.name).resolve()
+
+    if not p.exists():
+        raise HTTPException(400, detail=f"temp_path invalid or not found: {p.as_posix()}")
+
     task_id = int(dt.datetime.now().timestamp())
-    bg.add_task(_ingest_task, temp_path, mode, tag, dedupe, task_id)
+    bg.add_task(_ingest_task, p.as_posix(), mode, tag, dedupe, task_id)
     return {"task_id": task_id, "status": "queued"}
 
 def _ingest_task(temp_path: str, mode: str, tag: str | None, dedupe: bool, task_id: int):
-    # tạo log vào uploads
-    _log_upload(task_id, filename=os.path.basename(temp_path), tag=tag, mode=mode, status="ingesting")
-
     try:
+        if not temp_path or not os.path.exists(temp_path):         # ✅
+            raise FileNotFoundError(f"temp_path not found: {temp_path!r}")
+
         from docx import Document
         import datetime as dt
         from rag.parser import parse_docx_as_table, infer_year_from_doc
@@ -66,15 +84,15 @@ def _ingest_task(temp_path: str, mode: str, tag: str | None, dedupe: bool, task_
         default_year = infer_year_from_doc(doc) or dt.date.today().year
         events = parse_docx_as_table(temp_path, default_year)
 
-        if mode == "rebuild":
-            res = rebuild_events(events, STORE_DIR)
-        else:
-            res = append_events(events, STORE_DIR, dedupe=dedupe)
+        res = rebuild_events(events, STORE_DIR) if mode == "rebuild" else append_events(events, STORE_DIR, dedupe=dedupe)
 
-        _log_upload(task_id, added=res.get("added",0), total=res.get("total_after",0), status="done",
-                    log=json.dumps(res, ensure_ascii=False))
-    except Exception as e:
-        _log_upload(task_id, status="failed", log=str(e))
+        _log_upload(task_id, added=res.get("added",0), total=res.get("total_after",0),
+                    status="done", log=json.dumps(res, ensure_ascii=False))
+    except Exception:
+        import traceback
+        err = traceback.format_exc()
+        _log_upload(task_id, status="failed", log=err)
+        print("[INGEST_TASK][FAILED]\n", err)
 
 def _log_upload(task_id: int, filename: str | None=None, tag: str | None=None, mode: str | None=None,
                 status: str="queued", added: int | None=None, total: int | None=None, log: str | None=None):

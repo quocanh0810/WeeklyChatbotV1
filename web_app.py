@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
-# ========= Lazy import RAG =========
+# Lazy import RAG
 RAGAsk = None
 rag_ask = None
 rag_import_error = None
@@ -27,7 +27,7 @@ def _lazy_import_rag():
     except Exception as e:
         rag_import_error = f"{e}\n{traceback.format_exc()}"
 
-# ========= App =========
+# App
 app = FastAPI(title="TMU Weekly Bot", version="1.0.0")
 
 # CORS (có thể cấu hình qua ENV)
@@ -40,7 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ========= Static: web (frontend) =========
+# Static: web (frontend)
 WEB_DIR = "web"
 os.makedirs(WEB_DIR, exist_ok=True)
 app.mount("/assets", StaticFiles(directory=WEB_DIR, html=False), name="assets")
@@ -61,7 +61,7 @@ def favicon():
     # Không có favicon → trả rỗng
     return Response(status_code=204)
 
-# ========= (tuỳ chọn) Dashboard tĩnh ở /admin =========
+# ( option ) Dashboard tĩnh ở /admin
 WEB_ADMIN_DIR = "web_admin"
 if os.path.isdir(WEB_ADMIN_DIR):
     app.mount("/admin", StaticFiles(directory=WEB_ADMIN_DIR, html=True), name="admin")
@@ -81,7 +81,7 @@ except Exception:
     # Không chặn app nếu phần admin chưa sẵn
     pass
 
-# ========= Health & Version =========
+# Health & Version
 @app.get("/version")
 def version():
     return {"name": "TMU Weekly Bot", "version": app.version}
@@ -93,7 +93,7 @@ def health():
         return {"status": "degraded", "detail": "rag not ready", "error": rag_import_error}
     return {"status": "ok"}
 
-# ========= Chat API =========
+# Chat API
 class ChatRequest(BaseModel):
     message: str
 
@@ -121,7 +121,7 @@ def api_chat(req: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"internal_error: {e}")
 
-# ========= Tương thích client_cli.py cũ =========
+# Tương thích client_cli.py cũ
 class AskIn(BaseModel):
     question: str
 

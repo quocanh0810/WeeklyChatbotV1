@@ -7,8 +7,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-
-# ⬇️ quan trọng: include API admin ở ROOT
 from admin_api import router as admin_router
 
 app = FastAPI(title="TMU Weekly Bot", version="1.0.0")
@@ -21,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# === Mount frontend chatbot
+# Mount frontend chatbot
 WEB_DIR = os.path.join(os.path.dirname(__file__), "..", "web")
 WEB_DIR = os.path.abspath(WEB_DIR)
 os.makedirs(WEB_DIR, exist_ok=True)
@@ -34,12 +32,10 @@ def serve_index():
         return {"message": "Put your frontend in ./web (index.html, main.js, style.css)."}
     return FileResponse(index_path)
 
-# === Mount admin UI (static)
+# Mount admin UI (static)
 ADMIN_UI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web_admin"))
 if os.path.isdir(ADMIN_UI_DIR):
     app.mount("/admin", StaticFiles(directory=ADMIN_UI_DIR, html=True), name="admin-ui")
 
-# === Include admin API
+# Include admin API
 app.include_router(admin_router)
-
-# (các route /health, /api/chat, /ask của bạn giữ nguyên)

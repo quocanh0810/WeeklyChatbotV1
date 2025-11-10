@@ -1,5 +1,4 @@
 # parse_schedule.py — phiên bản đọc bảng 2 cột (Ngày | Công việc)
-# yêu cầu: pip install python-docx
 
 import argparse, json, re, datetime as dt
 from docx import Document
@@ -17,9 +16,7 @@ RE_ALLDAY    = re.compile(r"\b(cả\s*ngày)\b", re.IGNORECASE)
 RE_ONLINE    = re.compile(r"\b(trực tuyến|online)\b", re.IGNORECASE)
 RE_PLATFORM  = re.compile(r"(MS\s*Teams?|MSTeams?|MSTeam|Zoom|Google\s*Meet|Google\s*Meeting)", re.IGNORECASE)
 
-# =========================
-# Chuẩn hoá / Utilities
-# =========================
+# Chuẩn hoá
 # Bản đồ chuẩn hoá tên platform (chấp nhận có/không dấu cách)
 PLATFORM_MAP = {
     "msteams": "MS Teams",
