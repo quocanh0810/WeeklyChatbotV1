@@ -1,6 +1,6 @@
 ![Weekly Chatbot Screenshot](./WeeklyChatbot.png)
 
-![Weekly Chatbot Screenshot](./WeeklyChatbot2.png)
+![Weekly Chatbot Screenshot](./WeeklyChatbot1.png)
 
 # Weekly Schedule Chatbot (Self-hosted RAG with FAISS + SQLite)
 
