@@ -1,3 +1,5 @@
+![Weekly Chatbot Screenshot](./OverviewModel.png)
+
 ![Weekly Chatbot Screenshot](./WeeklyChatbot.png)
 
 ![Weekly Chatbot Screenshot](./WeeklyChatbot1.png)
