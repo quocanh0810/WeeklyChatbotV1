@@ -4,21 +4,24 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>TMU Weekly – Admin</title>
-  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="/admin/style.css" />
 </head>
 <body>
   <div class="shell">
-    <!-- Logo/brand nhỏ -->
     <header class="brand">
       <div class="dot"></div>
       <span>TMU Weekly – Admin</span>
+
+      <!-- Hiển thị tên user sau khi đăng nhập -->
+      <span id="who" class="muted hidden" style="margin-left:auto;margin-right:.5rem"></span>
+
+      <!-- Nút logout: ẩn mặc định -->
+      <button id="btnLogout" type="button" class="btn btn--ghost hidden">Logout</button>
     </header>
 
-    <!-- Login card (center) -->
     <section id="login" class="card card--login appear">
       <h1>Đăng nhập</h1>
       <p class="muted">Chỉ dành cho quản trị viên</p>
-
       <form id="fLogin" class="form">
         <div class="field">
           <label>User</label>
@@ -28,7 +31,6 @@
           <label>Pass</label>
           <input name="password" placeholder="Mật khẩu" type="password" required autocomplete="current-password"/>
         </div>
-
         <button class="btn" id="btnLogin" type="submit">
           <span class="btn__label">Login</span>
           <span class="spinner" aria-hidden="true"></span>
@@ -37,7 +39,6 @@
       </form>
     </section>
 
-    <!-- App content (ẩn trước, hiện sau khi login) -->
     <main id="app" class="app hidden">
       <section class="card">
         <h2>Tải lịch tuần (.docx)</h2>
@@ -50,12 +51,9 @@
 
         <form id="fIngest" class="form hidden">
           <input type="hidden" name="temp_path" />
-          <div class="choice">
-            <label><input type="radio" name="mode" value="append" checked/> Thêm dữ liệu</label>
-            <label><input type="radio" name="mode" value="rebuild"/> Build lại từ đầu</label>
-            <label><input type="checkbox" name="dedupe" checked/> Dedupe</label>
-            <input name="tag" placeholder="Tag (tuần)"/>
-          </div>
+          <input type="hidden" name="mode" value="append" />
+          <input type="hidden" name="dedupe" value="true" />
+          <input name="tag" placeholder="Tag (tuần)"/>
           <button class="btn" type="submit">
             <span class="btn__label">Tải lên</span>
             <span class="spinner" aria-hidden="true"></span>
@@ -70,11 +68,26 @@
         </div>
         <div class="table-wrap">
           <table id="tbl" class="table"></table>
+          <div class="pager">
+            <button id="pgPrev" class="btn btn--ghost">‹ Trước</button>
+            <span id="pgInfo" class="muted" style="margin: 0 .5rem;">Trang 1/1</span>
+            <button id="pgNext" class="btn btn--ghost">Sau ›</button>
+            <span style="margin-left:1rem">• Mỗi trang:</span>
+            <select id="pgSize" class="sel" style="margin-left:.25rem">
+              <option value="8" selected>8</option>
+              <option value="16">16</option>
+              <option value="24">24</option>
+              <option value="32">32</option>
+            </select>
+          </div>
         </div>
       </section>
     </main>
   </div>
 
-  <script src="admin.js"></script>
+  <script src="/admin/admin.js" defer></script>
+
+  <!-- Debug -->
+  <div id="debugPanel" class="debug hidden"></div>
 </body>
 </html>

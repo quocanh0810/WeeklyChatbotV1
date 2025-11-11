@@ -25,6 +25,7 @@ WEB_DIR = os.path.abspath(WEB_DIR)
 os.makedirs(WEB_DIR, exist_ok=True)
 app.mount("/assets", StaticFiles(directory=WEB_DIR, html=False), name="assets")
 
+
 @app.get("/")
 def serve_index():
     index_path = os.path.join(WEB_DIR, "index.html")

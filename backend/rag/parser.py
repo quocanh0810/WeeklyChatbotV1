@@ -198,6 +198,8 @@ def parse_docx_as_table(path: str, default_year: Optional[int] = None) -> List[D
                     if _scan_day_and_date(line):
                         continue
                     _emit_event(line)
+
+
     else:
         for p in doc.paragraphs:
             line = p.text.strip()

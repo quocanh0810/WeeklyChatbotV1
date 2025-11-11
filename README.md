@@ -1,8 +1,8 @@
-![Weekly Chatbot Screenshot](./OverviewModel.png)
+![Weekly Chatbot Screenshot](./doc/OverviewModel.png)
 
-![Weekly Chatbot Screenshot](./WeeklyChatbot.png)
+![Weekly Chatbot Screenshot](./doc/WeeklyChatbot.png)
 
-![Weekly Chatbot Screenshot](./WeeklyChatbot1.png)
+![Weekly Chatbot Screenshot](./doc/WeeklyChatbot1.png)
 
 # Weekly Schedule Chatbot (Self-hosted RAG with FAISS + SQLite)
 
@@ -22,22 +22,9 @@ pip install -r requirements.txt
 cp .env.example .env
 # Mở .env và điền OPENAI_API_KEY=sk-...
 
-# 1) Parse .docx → JSONL (tuỳ chỉnh đường dẫn nếu bạn thay file)
-python parse_schedule.py --input data/lich_tuan_3_2025_2026.docx --out data/schedule.jsonl
+# Chạy Web
 
-# 2) Ingest vào FAISS/SQLite
-# Lần đầu
-python ingest_faiss.py --jsonl data/schedule.jsonl --store-dir rag_store
-
-#Lần sau - append
-python ingest_faiss.py --jsonl data/week_2.jsonl --store-dir rag_store --append
-# 3) Chạy Web
-
-#Web Chatbot
-uvicorn web_app:app --reload --port 8000
-
-#Web Admin Dashboard
-uvicorn rag.web_app:app --reload --port 8001
+uvicorn backend.main:app --reload --port 8000
 
 #Tạo tài khoản, thêm biến sau trong .evn:
 ADMIN_USER=...

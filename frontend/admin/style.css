@@ -161,3 +161,43 @@
     80%{ transform:translateX(4px) }
   }
   .shake{ animation: shake .35s linear }
+
+  /* ẩn phần tử bằng class hidden */
+.hidden { display: none !important; }
+
+.hidden { display: none !important; }
+
+/* Panel debug cố định góc phải dưới */
+.debug {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  max-width: 40vw;
+  max-height: 40vh;
+  overflow: auto;
+  background: #0b1220;
+  color: #9ad;
+  border: 1px solid #2a3a55;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  box-shadow: 0 6px 30px rgba(0,0,0,.4);
+  z-index: 9999;
+}
+.debug b { color: #c7e1ff; }
+.debug .err { color: #ff8a8a; }
+.debug .ok  { color: #8affc1; }
+.debug .muted { color: #789; }
+
+/* ẩn phần tử khi chưa login */
+.hidden { display: none !important; }
+
+/* overlay debug */
+.debug {
+  position: fixed; right: 12px; bottom: 12px; z-index: 9999;
+  max-width: 40vw; max-height: 45vh; overflow: auto;
+  background: rgba(0,0,0,.75); color: #e6edf3; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 8px 10px; border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.35);
+}
+.debug .err{ color:#ffb4b4; }
+.debug .ok { color:#8bffa7; }
