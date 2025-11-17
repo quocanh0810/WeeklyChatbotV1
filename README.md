@@ -36,6 +36,6 @@ uvicorn backend.main:app --reload --port 8000
 # Admin credentials (add to .env):
 ADMIN_USER=...
 ADMIN_PASS=...
-```
+``` 
 
 ![Weekly Chatbot Screenshot](./doc/OverviewModel.png)
